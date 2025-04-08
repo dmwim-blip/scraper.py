@@ -1,43 +1,36 @@
-# scraper.py
-
-import time
-import json
-import requests
-from datetime import datetime
 from playwright.sync_api import sync_playwright
-from firebase_config import firebase_url
+import requests
+import datetime
+from firebase_config import FIREBASE_URL
+
+GAME_URL = "https://aviator-demo.spribegaming.com/?currency=USD&operator=demo&jurisdiction=CW&lang=EN&return_url=https%3A%2F%2Fspribe.co%2Fgames&user=34367&token=QtYFB4ypLkmb1bf31E6ujcKqsf8TpxoO"
+
+def send_to_firebase(data):
+    res = requests.post(f"{FIREBASE_URL}/aviator.json", json=data)
+    print("Data sent to Firebase:", res.status_code, res.text)
 
 def scrape_aviator_data():
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
-        context = browser.new_context()
-        page = context.new_page()
+        page = browser.new_page()
+        page.goto(GAME_URL)
+        print("Loaded Aviator demo game...")
 
-        # Demo Aviator game URL
-        url = "https://aviator-demo.spribegaming.com/?currency=USD&operator=demo&jurisdiction=CW&lang=EN&return_url=https:%2F%2Fspribe.co%2Fgames&user=54175&token=Ynyx3X8IHkq1BeqqS9LC9apbQatq8hSM"
-        page.goto(url)
+        page.wait_for_timeout(10000)  # wait 10 seconds for game data to load
 
-        print("[⏳] Waiting for the game to load...")
-        page.wait_for_timeout(15000)  # wait 15 seconds for game data
+        # Example: extract multiplier values
+        multipliers = page.query_selector_all(".crash-point")  # adjust selector based on website structure
 
-        while True:
-            try:
-                result = page.eval_on_selector(".history-item__value", "el => el.innerText")
-                timestamp = datetime.utcnow().isoformat()
+        for item in multipliers:
+            text = item.inner_text()
+            data = {
+                "multiplier": text,
+                "timestamp": datetime.datetime.utcnow().isoformat(),
+                "game_url": GAME_URL
+            }
+            send_to_firebase(data)
 
-                data = {
-                    "timestamp": timestamp,
-                    "result": result
-                }
-
-                print(f"[✅] Collected: {data}")
-
-                requests.post(f"{firebase_url}/aviator.json", data=json.dumps(data))
-                time.sleep(1)
-
-            except Exception as e:
-                print("[❌] Error while scraping:", str(e))
-                time.sleep(5)
+        browser.close()
 
 if __name__ == "__main__":
     scrape_aviator_data()
