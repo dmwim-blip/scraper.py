@@ -14,7 +14,7 @@ def scrape_aviator_data():
         page = context.new_page()
 
         # Demo Aviator game URL
-        url = "https://aviator-demo.spribegaming.com/?currency=USD&operator=demo&jurisdiction=CW&lang=EN&return_url=https%3A%2F%2Fspribe.co%2Fgames&user=34367&token=QtYFB4ypLkmb1bf31E6ujcKqsf8TpxoO"
+        url = "https://aviator-demo.spribegaming.com/?currency=USD&operator=demo&jurisdiction=CW&lang=EN&return_url=https:%2F%2Fspribe.co%2Fgames&user=54175&token=Ynyx3X8IHkq1BeqqS9LC9apbQatq8hSM"
         page.goto(url)
 
         print("[⏳] Waiting for the game to load...")
