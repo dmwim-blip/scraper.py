@@ -1,65 +1,46 @@
 from playwright.sync_api import sync_playwright
-import time
-import json
 import requests
+import time
 from firebase_config import firebase_url
+
+aviator_url = "https://aviator-demo.spribegaming.com/?currency=USD&operator=demo&jurisdiction=CW&lang=EN&return_url=https:%2F%2Fspribe.co%2Fgames&user=54175&token=Ynyx3X8IHkq1BeqqS9LC9apbQatq8hSM"
+
+def send_to_firebase(data):
+    res = requests.post(f"{firebase_url}/aviator.json", json=data)
+    print("[📤] Sent to Firebase:", res.status_code)
 
 def scrape_aviator_data():
     with sync_playwright() as p:
+        print("[🚀] Launching browser...")
         browser = p.chromium.launch(headless=True)
-        context = browser.new_context()
-        page = context.new_page()
+        page = browser.new_page()
+        page.goto(aviator_url)
+        print("[⏳] Waiting for iframe...")
 
-        print("[🚀] Opening Aviator demo...")
-        page.goto("https://aviator-demo.spribegaming.com/?currency=USD&operator=demo&jurisdiction=CW&lang=EN&return_url=https:%2F%2Fspribe.co%2Fgames&user=54175&token=Ynyx3X8IHkq1BeqqS9LC9apbQatq8hSM", wait_until="networkidle")
+        # Wait and switch to iframe
+        page.wait_for_selector("iframe", timeout=30000)
+        iframe = page.frame_locator("iframe").first
 
-        print("[⏳] Waiting for iframe to load...")
-        page.wait_for_selector("iframe", timeout=60000)
-
-        # Get the iframe element
-        iframe_element = page.query_selector("iframe")
-        frame = iframe_element.content_frame()
-
-        print("[✅] Inside iframe")
-
+        print("[🔍] Waiting for history items...")
         while True:
             try:
-                # Reload iframe contents
-                frame.reload()
-                time.sleep(2)
+                # Updated selector for the colored history multipliers above plane
+                elements = iframe.locator(".coefficient")  # this matches the multiplier boxes
+                elements.wait_for(timeout=15000)
 
-                # Wait for history block to load
-                frame.wait_for_selector(".history", timeout=30000)
+                values = elements.all_inner_texts()
+                print("[✅] Data:", values)
 
-                # Select all multipliers
-                values = frame.query_selector_all(".history .history-item__value")
-                if not values:
-                    print("[⚠️] No values found. Retrying...")
-                    time.sleep(1)
-                    continue
-
-                # Get latest (first) multiplier
-                multiplier_text = values[0].inner_text().strip()
-                multiplier_value = float(multiplier_text.replace("x", ""))
-
-                game_data = {
-                    "multiplier": multiplier_value,
+                payload = {
                     "timestamp": int(time.time()),
-                    "game_url": page.url
+                    "multipliers": values
                 }
-
-                # Send to Firebase
-                response = requests.post(f"{firebase_url}/aviator.json", data=json.dumps(game_data))
-                if response.status_code == 200:
-                    print(f"[✅] Sent: {multiplier_value}x")
-                else:
-                    print("[⚠️] Firebase error:", response.text)
-
-                time.sleep(1)
+                send_to_firebase(payload)
 
             except Exception as e:
-                print("[❌] Error while scraping:", e)
-                time.sleep(3)
+                print("[❌] Error:", e)
+
+            time.sleep(5)
 
 if __name__ == "__main__":
     scrape_aviator_data()
